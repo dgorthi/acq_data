@@ -11,17 +11,17 @@
 #include <time.h>
 
 #define UDP_HDR        8                        //UDP pkt HDRsize (bytes)
-#define UDP_DATA       8064                     //UDP pkt DATAsize (8192 bytes)
+#define UDP_DATA       4096                     //UDP pkt DATAsize (8192 bytes)
 #define UDP_PAYLOAD    (UDP_HDR+UDP_DATA)       //UDP pkt total size (bytes) 
 #define SRV_IP         "127.0.0.1"
 #define PORTS          1                        //Number of ports to send the data to
-#define MAX_PKTS       819200                   //Number of packets to be sent to each port of the receiver
-#define SLEEPTIME      60000                    //Parameter that controls the datarate
+#define MAX_PKTS       204800                   //Number of packets to be sent to each port of the receiver
+#define SLEEPTIME      5000                     //Parameter that controls the datarate
 int port_num[] = {10000, 9930, 9931, 9932, 9933, 9934, 9935, 9936, 9937, 9938, 9939, 9940};
 
 int main(void){ 
   struct sockaddr_in s_serv;
-  int soc,i,slen=sizeof(s_serv);
+  int soc,i,j,slen=sizeof(s_serv);
   unsigned long *pkt_no;
   unsigned char buf[UDP_PAYLOAD];
   struct timeval curr_time, start_time;
@@ -39,14 +39,14 @@ int main(void){
     
     memset(buf, 0, UDP_PAYLOAD);
     pkt_no = (unsigned long *)(buf);
-    (*pkt_no) = 1;
     
     gettimeofday(&start_time,NULL);
     
-    while ((*pkt_no)!=MAX_PKTS){
+    while (*pkt_no!=MAX_PKTS*512){
       int sending = sendto(soc, buf, UDP_PAYLOAD, 0, (struct sockaddr *)&s_serv, slen);
-      (*pkt_no)++;
-      for(i=0;i<SLEEPTIME;i++){} 
+      *pkt_no+=512;
+      //fprintf(stderr,"%d\n",*pkt_no);
+      for(i=0;i<SLEEPTIME;i++)for(j=0;j<SLEEPTIME;j++);
     }
     
     gettimeofday(&curr_time,NULL);

@@ -11,16 +11,16 @@
 #include <time.h>
 
 #define UDP_HDR          8                        // UDP pkt HDRsize (bytes)
-#define UDP_DATA      8064                        // UDP pkt DATAsize (bytes)
+#define UDP_DATA      4096                        // UDP pkt DATAsize (bytes)
 #define UDP_PAYLOAD   (UDP_HDR+UDP_DATA)          // UDP pkt total size (bytes) 
 #define NSOCKBUF         3                        // num of accumulate buffers
-#define NACC          8192                        // number of packets to 
+#define NACC          9216*2                        // number of packets to 
                                                   // accumulate per buffer
-#define ACC_BUFSIZE   (NACC*UDP_DATA)          // Data accumulate buffer size
+#define ACC_BUFSIZE   (NACC*UDP_DATA)             // Data accumulate buffer size
 #define ACC_FLGSIZE    NACC                       // flg accumulate buffer size
-#define FILESIZE        512                       // File size for data storage in MB
+#define FILESIZE      755.1904                       // File size for data storage in MB
 
-#define UDP_IP        "10.0.10.10"                // default ip addr
+#define UDP_IP        "10.10.12.35"                // default ip addr
 #define UDP_PORT       10000                      // default port number
 
 typedef struct {
@@ -36,12 +36,12 @@ typedef struct {
   unsigned long   bad,dbad;      // packets completely out of sequence
   double          rate,drate;    // estimated data rate (M bytes/s)
   long            log_rate;      // Number of packets after which to report 
-                                // stats (< 0 ==> don't generate report)
+                                 // stats (< 0 ==> don't generate report)
 }SockStat;
 
 typedef struct{
-  unsigned char   *data;        // data buf (size ACC_BUFSIZE) 
-  unsigned char   *flag;        // flag buf (size ACC_FLGSIZE) 
+  unsigned char   *data;        // data buf (size ACC_BUFSIZE)
+  unsigned char   *flag;        // flag buf (size ACC_FLGSIZE)
   unsigned long    start;       // seq no of first packet in buf
   unsigned long    stop;        // seq no of first packet in next buf
   unsigned int     idx;         // index of this buf in the circular buffer

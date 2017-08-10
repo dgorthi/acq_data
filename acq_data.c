@@ -10,22 +10,34 @@
     memcpy(&seq,sockpar->ubuf,UDP_HDR);		\
   }/* Get packet header*/
 
-#define GET_NEXT_PKT(){							\
-    while(recvfrom(sockpar->fd,sockpar->ubuf,UDP_PAYLOAD,0,NULL,NULL)!=UDP_PAYLOAD){ \
-      if(errno != EAGAIN){						\
-	perror("acquire_socket_data");					\
-	return 1;							\
-      }									\
-    }									\
-    GET_SEQ_NUM();							\
-  }/*Get UDP_PAYLOAD size data packet from the socket*/
-
+long long GET_NEXT_PKT(SockPar *sockpar);
 static int DoFinish=0;
 void init_sock_stat(SockStat *stat);
 void report_socket_stat(SockStat *stat);
 int init_socket(SockPar *sockpar);
 int acquire_socket_data(SockPar *sockpar);
 int transfer_socket_data(SockPar *sockpar);
+
+long long GET_NEXT_PKT(SockPar *sockpar){
+  unsigned long long pos=0ULL,seq=0ULL;
+  while(recvfrom(sockpar->fd,sockpar->ubuf,UDP_PAYLOAD,0,NULL,NULL)!=UDP_PAYLOAD){
+    if(errno != EAGAIN){
+      perror("acquire_socket_data");
+      return 1;
+    }
+  }
+  GET_SEQ_NUM();
+//fprintf(stderr, "%llu : \n", pos);
+pos = (unsigned long long)pos/512;
+  if (pos%8 >=3 && pos%8<=5){
+    seq = 3*((unsigned long long)pos/8) + pos%8 -3;
+    //fprintf(stderr, "%llu : %llu\n", pos, seq);
+    return seq;
+  }
+  else GET_NEXT_PKT(sockpar);
+}/*Get UDP_PAYLOAD size data packet from the socket*/
+
+static int DoFinish=0;
 
 void init_sock_stat(SockStat *stat){ 
   stat->total         = 0;
@@ -42,7 +54,7 @@ void init_sock_stat(SockStat *stat){
   stat->start.tv_nsec = 0;
   stat->dstart.tv_sec = 0;
   stat->dstart.tv_nsec= 0;
-  stat->log_rate      = 32*NACC; // should be a multiple of NACC
+  stat->log_rate      = NACC; // should be a multiple of NACC
 
   return;
 }
@@ -269,7 +281,7 @@ int transfer_socket_data(SockPar *sockpar){
   /* Include time and date info in the data file*/
   time(&rawtime);
   now = localtime(&rawtime);
-  strftime(filename,sizeof(filename), "/data0/data_%Y-%m-%d_%T", now);	
+  strftime(filename,sizeof(filename), "data_%Y-%m-%d_%H-%M-%S_", now);	
   fp=fopen(filename,"a+");
   
   while(!DoFinish){
@@ -287,14 +299,14 @@ int transfer_socket_data(SockPar *sockpar){
 	npkt=0;
 	time(&rawtime);
 	now = localtime(&rawtime);
-	strftime(filename,sizeof(filename), "/data0/data_%Y-%m-%d_%T", now);	
+	strftime(filename,sizeof(filename), "data_%Y-%m-%d_%H-%M-%S_", now);	
 	fp=fopen(filename,"a+");
       }
       fwrite(idxc->data, UDP_DATA, NACC, fp);
       fwrite(idxc->flag, sizeof(unsigned char), NACC, fp);
       npkt++;
     }else{ /* data not available yet, check again*/
-      usleep(sleep_time);
+      //usleep(sleep_time);
       //for(i=0;i<1000;i++);
     }
   }
