@@ -219,21 +219,20 @@ int acquire_socket_data(SockPar *sockpar){
     /*Restart if you get a bunch of bad packets*/
     if(stat->bad > 0.75*NACC){
       fprintf(stderr,"\n\nGot a lot of bad packets. Resetting.\n\n");
-      sockpar->curr->start=0;
-      /*Transfer useful data before this??*/
-      /* GET_NEXT_PKT() */
-      /* sockpar->curr->start = seq; */
-      /* sockpar->curr->stop  = seq+NACC; */
-      /* sockpar->next->start = sockpar->curr->stop; */
-      /* sockpar->next->stop  = sockpar->next->start+NACC; */
-      /* for(i=0;i<3;i++){ */
-      /* 	SockBuf *sbuf=sockpar->sbuf+i; */
-      /* 	for(j=0;j<NACC;j++)sbuf->flag[j]=1; // all data pre-flagged */
-      /* } */
-      /* clock_gettime(CLOCK_MONOTONIC,&stat->start); */
-      /* stat->dstart=stat->start; */
+      //TODO: Transfer useful data before this
+      GET_NEXT_PKT()
+      sockpar->curr->start = seq;
+      sockpar->curr->stop  = seq+NACC;
+      sockpar->next->start = sockpar->curr->stop;
+      sockpar->next->stop  = sockpar->next->start+NACC;
+      for(i=0;i<3;i++){
+      	SockBuf *sbuf=sockpar->sbuf+i;
+      	for(j=0;j<NACC;j++)sbuf->flag[j]=1; // pre-flag data
+      }
+      clock_gettime(CLOCK_MONOTONIC,&stat->start);
+      stat->dstart=stat->start;
       stat->bad=0;
-      /* stat->got=0; */
+      stat->got=0; //to reset statistics info
     }
 
     /* report statististics periodically */
