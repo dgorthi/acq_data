@@ -24,8 +24,8 @@ static int DoFinish=0;
 void init_sock_stat(SockStat *stat);
 void report_socket_stat(SockStat *stat);
 int init_socket(SockPar *sockpar);
-int acquire_socket_data(SockPar *sockpar);
-int transfer_socket_data(SockPar *sockpar);
+int acquire_socket_data(SockPar *sockpar, int debug);
+int transfer_socket_data(SockPar *sockpar, int debug);
 
 void init_sock_stat(SockStat *stat){ 
   stat->total         = 0;
@@ -125,7 +125,7 @@ int init_socket(SockPar *sockpar){
   return 1;
 }
 
-int acquire_socket_data(SockPar *sockpar){
+int acquire_socket_data(SockPar *sockpar, int debug){
 
   SockStat      *stat=&sockpar->stat;
   unsigned      i,j;
@@ -166,36 +166,37 @@ int acquire_socket_data(SockPar *sockpar){
     
     /* copy packet data to the correct location, if possible */
     if(seq >= sockpar->curr->start && seq < sockpar->curr->stop){
-      /* packet belongs to current buffer */
-      offset=(seq-sockpar->curr->start);
-      if(!sockpar->curr->flag[offset]){
-	/* duplicate packet! */
-	stat->bad++;stat->dbad++;
-      }else{
-	sockpar->curr->flag[offset]=0;
-	offset=offset*UDP_DATA;
-	memcpy(sockpar->curr->data+offset,sockpar->ubuf+UDP_HDR,UDP_DATA);
-	sockpar->curr->count++;
-	stat->got++; stat->dgot++;
-      }
+        /* packet belongs to current buffer */
+        if (debug) fprintf(stderr,"curr: %ld\n",seq);
+        offset=(seq-sockpar->curr->start);
+        if(!sockpar->curr->flag[offset]){
+	        /* duplicate packet! */
+	        stat->bad++;stat->dbad++;
+        }else{
+            sockpar->curr->flag[offset]=0;
+            offset=offset*UDP_DATA;
+            memcpy(sockpar->curr->data+offset,sockpar->ubuf+UDP_HDR,UDP_DATA);
+            sockpar->curr->count++;
+            stat->got++; stat->dgot++;
+        }
+    }else if(seq >= sockpar->next->start && seq < sockpar->next->stop){
+        /* packet belongs to next buffer */
+        if (debug) fprintf(stderr,"next: %ld\n",seq);
+        offset=(seq-sockpar->next->start);
+        if(!sockpar->next->flag[offset]){
+            /* duplicate packet */
+            stat->bad++;stat->dbad++;
+        }else{
+            sockpar->next->flag[offset]=0;
+            offset=offset*UDP_DATA;
+            memcpy(sockpar->next->data+offset,sockpar->ubuf+UDP_HDR,UDP_DATA);
+            sockpar->next->count++;
+            stat->got++;stat->dgot++;
+        }
     }else{
-      if(seq >= sockpar->next->start && seq < sockpar->next->stop){
-	/* packet belongs to next buffer */
-	offset=(seq-sockpar->next->start);
-	if(!sockpar->next->flag[offset]){
-	  /* duplicate packet */
-	  stat->bad++;stat->dbad++;
-	}else{
-	  sockpar->next->flag[offset]=0;
-	  offset=offset*UDP_DATA;
-	  memcpy(sockpar->next->data+offset,sockpar->ubuf+UDP_HDR,UDP_DATA);
-	  sockpar->next->count++;
-	  stat->got++;stat->dgot++;
-	}
-      }else{
-	/* packet is badly out of time, drop */
-	stat->bad++;stat->dbad++;
-      }
+	    /* packet is badly out of time, drop */
+        if (debug) fprintf(stderr,"pkt drop\n");
+	    stat->bad++;stat->dbad++;
     }
 
     if((sockpar->curr->count == NACC) || 
@@ -250,7 +251,7 @@ int acquire_socket_data(SockPar *sockpar){
     return 1;
 }
 
-int transfer_socket_data(SockPar *sockpar){
+int transfer_socket_data(SockPar *sockpar, int debug){
 
   unsigned int     max_pkt = (FILESIZE*1024*1024)/ACC_BUFSIZE;
   unsigned int     npkt=0,i,idx0,idx,sleep_time,cnt=0;
@@ -269,15 +270,15 @@ int transfer_socket_data(SockPar *sockpar){
   /* Include time and date info in the data file*/
   time(&rawtime);
   now = localtime(&rawtime);
-  strftime(filename,sizeof(filename), "/data0/data_%Y-%m-%d_%T", now);	
+  strftime(filename,sizeof(filename), "data_%Y-%m-%d_%T", now);	
   fp=fopen(filename,"a+");
   
   while(!DoFinish){
-    if(sockpar->copy != NULL && (idx=sockpar->copy->idx) != idx0){ 
+    if(sockpar->copy != NULL && (idx=sockpar->copy->idx) != idx0){
       /* got fresh data*/
-      //fprintf(stderr,"idx: %d\tidx0: %d\n",idx,idx0);
+      if (debug) fprintf(stderr,"idx: %d\tidx0: %d\n",idx,idx0);
       if(idx != (idx0+1)%NSOCKBUF) // missed at least one buf!
-	fprintf(stderr,"transfer_socket_data(): missed copying a buffer!\n");
+	     fprintf(stderr,"transfer_socket_data(): missed copying a buffer!\n");
 
       idx0 = idx;
       idxc = sockpar->copy;
@@ -287,7 +288,7 @@ int transfer_socket_data(SockPar *sockpar){
 	npkt=0;
 	time(&rawtime);
 	now = localtime(&rawtime);
-	strftime(filename,sizeof(filename), "/data0/data_%Y-%m-%d_%T", now);	
+	strftime(filename,sizeof(filename), "data_%Y-%m-%d_%T", now);	
 	fp=fopen(filename,"a+");
       }
       fwrite(idxc->data, UDP_DATA, NACC, fp);
@@ -307,28 +308,43 @@ int main(int argc, char **argv){
   int              tid,arg;
   unsigned short   port;
   int              sockbufsize=1024*1024*1024; // 512 MB socket buffer
+  int              debug = 0;
 
-  init_socket(&sockpar);
 
   /* check if the user want's to override the defaults */
-  while((arg=getopt(argc,argv,"i:p:")) !=-1){
+  while((arg=getopt(argc,argv,"hvi:p:")) !=-1){
     switch(arg){
+    case 'h':
+      fprintf(stderr,"\nUsage: %s [OPTIONS]\n\n",argv[0]);
+      fprintf(stderr,"-h\tPrint this help essage\n"
+                     "-i\tIP address of host\n"
+                     "-p\tPort of the host\n"
+                     "-v\tPrint helpful debug messages\n");
+      return 0;
     case 'i':
       fprintf(stderr,"inet_addr= %s\n",optarg);
       if(inet_aton(optarg,&sockpar.addr.sin_addr)==0){
-	fprintf(stderr,"Illegal IP address %s\n",optarg);
-	return 1;
+	     fprintf(stderr,"Illegal IP address %s\n",optarg);
+	     return 1;
       }
       break;
     case 'p':
       port=(unsigned short)atoi(optarg);
       sockpar.addr.sin_port = htons(port); 
       break;
+    case 'v':
+      debug = 1; break;
     default:
-      fprintf(stderr,"Usage: acq [-i ip][-p port]\n");
+      fprintf(stderr,"\nUsage: %s [OPTIONS]\n\n",argv[0]);
+      fprintf(stderr,"-h\tPrint this help essage\n"
+                     "-i\tIP address of host\n"
+                     "-p\tPort of the host\n"
+                     "-v\tPrint helpful debug messages\n");
       return 1;
     }
   }
+
+  init_socket(&sockpar);
 
   /* open the socket and bind to the specified address */
   if((sockpar.fd=socket(AF_INET,SOCK_DGRAM|SOCK_NONBLOCK,IPPROTO_UDP))<0){
@@ -351,9 +367,9 @@ int main(int argc, char **argv){
 #pragma omp parallel num_threads(2) private (tid) shared(sockpar)
   { tid  = omp_get_thread_num(); 
     if(tid==0){
-      acquire_socket_data(&sockpar);  // copy data from socket 
+      acquire_socket_data(&sockpar,debug);  // copy data from socket 
     }else{
-      transfer_socket_data(&sockpar); //transfer socket data
+      transfer_socket_data(&sockpar,debug); //transfer socket data
     }
   }
 
