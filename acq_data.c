@@ -270,7 +270,7 @@ int transfer_socket_data(SockPar *sockpar, int debug){
   /* Include time and date info in the data file*/
   time(&rawtime);
   now = localtime(&rawtime);
-  strftime(filename,sizeof(filename), "data_%Y-%m-%d_%T", now);	
+  strftime(filename,sizeof(filename),"data_%s.bin",now);	
   fp=fopen(filename,"a+");
   
   while(!DoFinish){
@@ -288,7 +288,7 @@ int transfer_socket_data(SockPar *sockpar, int debug){
 	npkt=0;
 	time(&rawtime);
 	now = localtime(&rawtime);
-	strftime(filename,sizeof(filename), "data_%Y-%m-%d_%T", now);	
+	strftime(filename,sizeof(filename),"data_%s.bin",now);	
 	fp=fopen(filename,"a+");
       }
       fwrite(idxc->data, UDP_DATA, NACC, fp);
