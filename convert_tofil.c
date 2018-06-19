@@ -1,5 +1,5 @@
 #ifndef __REMOVE_RFI_H__
-#include "removeRFI.h"
+#include "converto_fil.h"
 #endif
 
 long seed =5;
